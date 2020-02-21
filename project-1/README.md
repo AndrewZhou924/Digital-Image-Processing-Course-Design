@@ -2,9 +2,14 @@
 
 > PS: It is strongly recommended to run this code with NVIDIA GTX 1080Ti
 
+## Usage
+
+## Result
+
 ## TODO
 
 - [x] 完成基本框架
 - [ ] 完成README
 - [x] 完成对参数K的搜索并绘制相关图表
-- [ ] 添加cosine/HOG等多种特征
+- [x] 添加cosine特征
+- [ ] 添加HOG等多种特征

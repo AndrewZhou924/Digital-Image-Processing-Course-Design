@@ -104,7 +104,7 @@ class NearestNeighbor:
         :return: None
         '''
 
-        assert method in ['l1', 'l2']
+        assert method in ['l1', 'l2', 'cosine']
 
         distance = []
 
@@ -118,6 +118,10 @@ class NearestNeighbor:
         if method=='l2':
             # for L2 distance
             distance = -2 * x.dot(self.x.T) + np.sum(np.square(x), axis=1, keepdims=1) + np.sum(np.square(self.x), axis=1).T
+
+        if method=='cosine':
+            # for cosine distance
+            distance = 1 - x.dot(self.x.T) / np.linalg.norm(x, axis=1, keepdims=1) / np.linalg.norm(self.x, axis=1).T
 
         self.sorted = []
         for i in tqdm(range(distance.shape[0])): # for not cuda oom, use forloop instead of np.argsort the whole array
@@ -155,19 +159,16 @@ class NearestNeighbor:
 
         return correct/total
 
-
 train_datas, train_labels, test_datas, test_labels = cifar10(args.dir)
 # data_check(train_datas, train_labels) # check if datas and labels match
 knn_model = NearestNeighbor()
 knn_model.train(train_datas, train_labels)
-
 
 # caculate forward time
 start = time.time()
 knn_model.forward(test_datas, method=args.method)
 end = time.time()
 print('knn model forward time: {}'.format(end-start))
-
 
 # search K
 acc = list()
