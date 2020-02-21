@@ -2,12 +2,17 @@ import pickle
 import os
 from tqdm import tqdm
 import argparse
+import matplotlib.pyplot as plt
+import time
 
 # use cuda or not
 def str2bool(s):
     return s in ['1', 'True', 'TRUE']
 parser = argparse.ArgumentParser()
 parser.add_argument('--cuda', required=True, type=str2bool, help='Use cuda or not')
+parser.add_argument('--dir', required=True, type=str, help='Dataset directory')
+parser.add_argument('--method', required=False, default='l1', type=str, help='method for feature extract')
+parser.add_argument('--maxk', required=False, default=20, type=int, help='max k')
 args = parser.parse_args()
 if args.cuda:
     import cupy as np
@@ -150,14 +155,28 @@ class NearestNeighbor:
 
         return correct/total
 
-if __name__=='__main__':
-    train_datas, train_labels, test_datas, test_labels = cifar10('data/cifar-10-batches-py/')
-    # data_check(train_datas, train_labels) # check if datas and labels match
-    knn_model = NearestNeighbor()
-    knn_model.train(train_datas, train_labels)
 
-    knn_model.forward(test_datas, method='l1')
-    test_predictions = knn_model.predict(k=10)
-    acc = knn_model.criterion(test_labels, test_predictions)
-    print('final acc: {}'.format(acc))
+train_datas, train_labels, test_datas, test_labels = cifar10(args.dir)
+# data_check(train_datas, train_labels) # check if datas and labels match
+knn_model = NearestNeighbor()
+knn_model.train(train_datas, train_labels)
 
+
+# caculate forward time
+start = time.time()
+knn_model.forward(test_datas, method=args.method)
+end = time.time()
+print('knn model forward time: {}'.format(end-start))
+
+
+# search K
+acc = list()
+for k in range(1, args.maxk+1):
+    test_predictions = knn_model.predict(k)
+    acc.append(knn_model.criterion(test_labels, test_predictions))
+x = list(range(1, args.maxk+1))
+
+# draw image
+plt.plot(x, acc)
+plt.title('method={} maxk={}'.format(args.method, args.maxk))
+plt.savefig('{}-{}.jpg'.format(args.method, args.maxk))
