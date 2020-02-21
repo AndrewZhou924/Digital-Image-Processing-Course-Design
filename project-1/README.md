@@ -12,4 +12,6 @@
 - [ ] 完成README
 - [x] 完成对参数K的搜索并绘制相关图表
 - [x] 添加cosine特征
-- [ ] 添加HOG等多种特征
+- [x] 添加HOG特征
+- [ ] 对HOG的cell/block参数做调整
+- [ ] SIFT特征
