@@ -1,22 +1,28 @@
 import pickle
 import os
-from tqdm import tqdm
+import numpy
 import argparse
 import matplotlib.pyplot as plt
 import time
 from collections import Counter
+from tqdm import tqdm
 from skimage.feature import hog
-import numpy
+from model.NearestNeighbor import NearestNeighbor
+from model.SVM import SVM
 
 # use cuda or not
 def str2bool(s):
     return s in ['1', 'True', 'TRUE']
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--cuda', required=True, type=str2bool, help='Use cuda or not')
 parser.add_argument('--dir', required=True, type=str, help='Dataset directory')
 parser.add_argument('--use_hog', required=False, default=False, type=str2bool, help='Use hog or not')
 parser.add_argument('--method', required=False, default='l1', type=str, help='method for feature extract')
 parser.add_argument('--maxk', required=False, default=20, type=int, help='max k')
+parser.add_argument('--model', required=False, default='knn', type=str, help='avaliable model: knn, svm')
+parser.add_argument('--iters', required=False, default=200, type=int, help='max number of iterations')
+
 args = parser.parse_args()
 if args.cuda:
     import cupy as np
@@ -123,110 +129,77 @@ def data_check(datas: np.array, labels: np.array) -> None:
         plt.title(label_class_map[label])
         plt.show()
 
-class NearestNeighbor:
-    def train(self, x: np.array, y: np.array) -> None:
-        '''
-        train process for KNN
-        :param x: train data x
-        :param y: train label y
-        :return: None
-        '''
-        self.x = x[:10000, :]
-        self.y = y[:10000]
 
-    def forward(self, x: np.array, method: str) -> None:
-        '''
-        feature extract and argsort
-        :param x: test data x
-        :param method: method for feature extract
-        :return: None
-        '''
-
-        assert method in ['l1', 'l2', 'cosine']
-
-        distance = []
-
-        if method=='l1':
-            # for L1 distance
-            data_num = x.shape[0]
-            for i in tqdm(range(data_num)):
-                distance.append(np.sum(np.abs(self.x - x[i]), axis = 1))
-            distance = np.array(distance)
-
-        if method=='l2':
-            # for L2 distance
-            distance = -2 * x.dot(self.x.T) + np.sum(np.square(x), axis=1, keepdims=1) + np.sum(np.square(self.x), axis=1).T
-
-        if method=='cosine':
-            # for cosine distance
-            distance = 1 - x.dot(self.x.T) / np.linalg.norm(x, axis=1, keepdims=1) / np.linalg.norm(self.x, axis=1).T
-
-        # self.distance = distance
-        self.sorted = []
-        for i in tqdm(range(distance.shape[0])): # for not cuda oom, use forloop instead of np.argsort the whole array
-            self.sorted.append(np.argsort(distance[i]).tolist())
-
-    def predict(self, k: int) -> np.array:
-        '''
-        get result for knn
-        :param k: knn's k
-        :return: y_pred
-        '''
-        # y_pred = np.zeros(self.distance.shape[0], dtype=self.y.dtype)
-        # for i in range(self.distance.shape[0]):
-        #     curr_distance = self.distance[i]
-        #     min_idx = np.argpartition(curr_distance, k)[0:k]
-        #     votes = self.y[min_idx]
-        #     labels_count = np.bincount(votes)
-        #     y_pred[i] = np.argmax(labels_count)
-        # return y_pred
-        # another way to get predict result. np.argpartition and np.bincount
-
-        y_pred = np.zeros(len(self.sorted), dtype=self.y.dtype)
-        for i in range(len(self.sorted)):
-            classes = self.y[self.sorted[i][:k]].tolist()
-            counter = Counter(classes)
-            y_pred[i] = counter.most_common()[0][0]
-        return y_pred
-
-    def criterion(self, y_gt: np.array, y_pred: np.array) -> float:
-        '''
-        critertion for KNN Model, return the accuracy for predict result
-        :param y_gt: ground truth in numpy array
-        :param y_pred: predict result in numpy array
-        :return: accuracy in float
-        '''
-        assert y_gt.shape == y_pred.shape
-
-        total = y_gt.shape[0]
-
-        correct = np.equal(y_gt, y_pred).sum()
-
-        return correct/total
 
 train_datas, train_labels, test_datas, test_labels = cifar10(args.dir, args.use_hog)
+print("==> train_datas shape: ", np.array(train_datas).shape)
+print("==> train_labels shape: ", np.array(train_labels).shape)
+print("==> test_datas shape: ", np.array(test_datas).shape)
+print("==> test_labels shape: ", np.array(test_labels).shape)
+
 # data_check(train_datas, train_labels) # check if datas and labels match
-knn_model = NearestNeighbor()
-knn_model.train(train_datas, train_labels)
 
-# caculate forward time
-start = time.time()
-knn_model.forward(test_datas, method=args.method)
-end = time.time()
-print('knn model forward time cost: {}'.format(end-start))
+# training model
+if args.model == "knn":
+    model = NearestNeighbor(args.cuda)
+    model.train(train_datas, train_labels)
 
-# search K
-acc = list()
-for k in tqdm(range(1, args.maxk+1)):
-    test_predictions = knn_model.predict(k)
-    acc.append(knn_model.criterion(test_labels, test_predictions))
-start = time.time()
-print('knn model traverse k time cost: {}'.format(start-end))
+    # caculate forward time
+    start = time.time()
+    model.forward(test_datas, method=args.method)
+    end = time.time()
+    print('knn model forward time cost: {}'.format(end-start))
 
-# draw image
-x = list(range(1, args.maxk+1))
-plt.plot(x, acc)
-plt.title('method={} maxk={} use_hog={}'.format(args.method, args.maxk, args.use_hog))
-plt.savefig('{}-{}-{}.jpg'.format(args.method, args.maxk, 'HOG' if args.use_hog else 'NO_HOG'))
+    # search K
+    acc = list()
+    for k in tqdm(range(1, args.maxk+1)):
+        test_predictions = model.predict(k)
+        acc.append(model.criterion(test_labels, test_predictions))
+    start = time.time()
+    print('knn model traverse k time cost: {}'.format(start-end))
 
-print('max accuracy: {}'.format(max(acc)))
+    # draw image
+    x = list(range(1, args.maxk+1))
+    plt.plot(x, acc)
+    plt.title('method={} maxk={} use_hog={}'.format(args.method, args.maxk, args.use_hog))
+    plt.savefig('{}-{}-{}.png'.format(args.method, args.maxk, 'HOG' if args.use_hog else 'NO_HOG'))
+
+    print('max accuracy: {}'.format(max(acc)))
+
+elif args.model == "svm":
+    model = SVM()
+
+    # search learning_rates and regularization_strengths
+    learning_rates = [1e-7, 1.3e-7, 1.4e-7, 1.5e-7, 1.6e-7]
+    regularization_strengths = [8000.0, 9000.0, 10000.0, 11000.0, 18000.0, 19000.0, 20000.0]
+
+    results = {}
+    best_lr = None
+    best_reg = None
+    best_val = -1   # The highest validation accuracy that we have seen so far.
+    best_svm = None # The LinearSVM object that achieved the highest validation rate.
+
+    for lr in tqdm(learning_rates):
+        for reg in regularization_strengths:
+            svm = SVM()
+
+            loss_history = svm.train(train_datas, train_labels, learning_rate=lr, reg=reg, num_iters=args.iters, batch_size=200)
+            y_train_pred = svm.predict(train_datas)
+            accuracy_train = np.mean(y_train_pred == train_labels)
+
+            y_val_pred = svm.predict(test_datas)
+            accuracy_val = np.mean(y_val_pred == test_labels)
+
+            if accuracy_val > best_val:
+                best_lr = lr
+                best_reg = reg
+                best_val = accuracy_val
+                best_svm = svm
+            results[(lr, reg)] = accuracy_train, accuracy_val
+            print('==> [Training SVM] lr: %e reg: %e train accuracy: %f val accuracy: %f' %
+                    (lr, reg, results[(lr, reg)][0], results[(lr, reg)][1]))
+    
+    # finish training, report result
+    print('==> [SVM] Best validation accuracy during cross-validation:\nlr = %e, reg = %e, best_val = %f' %
+        (best_lr, best_reg, best_val))
+

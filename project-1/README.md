@@ -6,6 +6,14 @@
 
 ## Result
 
+| Classifier | Configuration  | Accuracy |
+| ---------- | -------------- | -------- |
+| KNN        | TODO           | TODO     |
+| SVM        | lr: 1e-7       | 0.31     |
+| SVM        | lr: 1e-7 + Hog | 0.33     |
+
+
+
 ## TODO
 
 - [x] 完成基本框架
