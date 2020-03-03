@@ -1,7 +1,9 @@
 #! -*-coding:utf8-*-
 import numpy as np
+# import cupy as np
 from random import shuffle
 from tqdm import tqdm 
+from tools.gradient_check import grad_check,eval_numerical_gradient
 
 class softmax(object):
     def __init__(self):
@@ -14,44 +16,69 @@ class softmax(object):
 
         # initialize weight metric W
         if self.W is None:
-            self.W = 0.001 * np.random.randn(dim, num_classes)
+            # C :number of classes
+            # D: dimension of each flattened image
+            C, D = num_classes, 3072 
+            self.W = np.random.randn(C, D) * 0.001
 
         loss_history = []
         for it in tqdm(range(num_iters)):
             X_batch = None
             y_batch = None
             
-            for batchId in range(int(num_train / batch_size)):
-                # idx = np.random.choice(num_train, batch_size)
-                # X_batch = X[idx, :]
-                # y_batch = y[idx]
+            # TODO add option
 
-                X_batch = X[batchId*batch_size: (batchId+1)*batch_size]
-                y_batch = y[batchId*batch_size: (batchId+1)*batch_size]
+            # Batch normolization
+            # for batchId in range(int(num_train / batch_size)):
+            #     X_batch = X[batchId*batch_size: (batchId+1)*batch_size]
+            #     y_batch = y[batchId*batch_size: (batchId+1)*batch_size]
+            #     loss, grad = self.loss(X_batch, y_batch, reg)
+            #     loss_history.append(loss)
+            #     self.W -= learning_rate * grad
 
-                loss, grad = self.loss(X_batch, y_batch, reg)
-                loss_history.append(loss)
-                self.W -= learning_rate * grad
+            idx = np.random.choice(num_train, batch_size)
+            X_batch = X[idx, :]
+            y_batch = y[idx]
+            X_batch = X_batch.T
+
+            loss, grad = self.loss(X_batch, y_batch, reg)
+            loss_history.append(loss)
+            self.W -= learning_rate * grad
 
             if verbose and it % 100 == 0:
                 print('iteration %d / %d: loss %f' % (it, num_iters, loss))
 
         return loss_history
 
-    def loss(self, X_batch, y_batch, reg):
-        loss = 0.0
-        dW = np.zeros_like(self.W)
-        num_train = X_batch.shape[0]
-        WX = np.matmul(X_batch, self.W)
-        out_put = np.exp(WX) / np.sum(np.exp(WX), axis=1, keepdims=True)
-        loss = 1 / num_train * np.sum(-np.log(out_put[range(num_train), list(y_batch)])) + 0.5 * reg * np.sum(self.W * self.W)
-        out_put[range(num_train), list(y_batch)] -= 1
-        out_put = np.matmul(X_batch.T, out_put)
-        dW = out_put / num_train + reg * self.W
+    def loss(self, x, y, reg):
+        """
+        Calculate the cross-entropy loss and the gradient for each iteration of training.
+        Arguments:
+            x: D * N numpy array as the training data, where D is the dimension and N the training sample size
+            y: 1D numpy array with length N as the labels for the training data
+        Output:
+            loss: a float number of calculated cross-entropy loss
+            dW: C * D numpy array as the calculated gradient for W, where C is the number of classes, and 10 for this model
+        """
 
+        # Calculation of loss
+        z = np.dot(self.W, x)
+        z -= np.max(z, axis=0)  # Max trick for the softmax, preventing infinite values
+        p = np.exp(z) / np.sum(np.exp(z), axis=0)  # Softmax function
+        L = -1 / len(y) * np.sum(np.log(p[y, range(len(y))]))  # Cross-entropy loss
+        R = 0.5 * np.sum(np.multiply(self.W, self.W))  # Regularization term
+        loss = L + R * reg  # Total loss
+
+        # Calculation of dW
+        p[y, range(len(y))] -= 1
+        dW = 1 / len(y) * p.dot(x.T) + reg * self.W
         return loss, dW
 
     def predict(self, X):
-        y_pred = np.argmax(X.dot(self.W), axis=1)
+        # y_pred = np.argmax(X.dot(self.W), axis=1)
+        y_pred = np.argmax(np.dot(self.W, X.T), axis=0)
+
         return y_pred
+  
+
   

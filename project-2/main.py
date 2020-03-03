@@ -10,6 +10,7 @@ from skimage.feature import hog
 from model.NearestNeighbor import NearestNeighbor
 from model.SVM import SVM
 from model.softmax import softmax
+from tools.gradient_check import grad_check,eval_numerical_gradient
 
 # use cuda or not
 def str2bool(s):
@@ -26,12 +27,26 @@ parser.add_argument('--iters', required=False, default=200, type=int, help='max 
 parser.add_argument('--batch_size', required=False, default=200, type=int, help='batch_size')
 parser.add_argument('--data_check', required=False, default=False, type=bool, help='check data or not')
 
+parser.add_argument('--standardization', required=False, default=False, type=bool, help='data standardization')
+parser.add_argument('--normalization', required=False, default=False, type=bool, help='data normalization')
+parser.add_argument('--verbose', required=False, default=False, type=bool, help='verbose')
+parser.add_argument('--checkGradient', required=False, default=False, type=bool, help='check Gradient')
+
 args = parser.parse_args()
 if args.cuda:
     import cupy as np
 else:
     import numpy as np
 # ugly code here
+
+def normalization(data):
+    _range = np.max(data, axis=0) - np.min(data, axis=0)
+    return (data - np.min(data, axis=0)) / _range
+ 
+def standardization(data):
+    mu = np.mean(data, axis=0)
+    sigma = np.std(data, axis=0)
+    return (data - mu) / sigma
 
 def unpickle(file: str) -> dict:
     '''
@@ -42,7 +57,7 @@ def unpickle(file: str) -> dict:
         d = pickle.load(fo, encoding='bytes')
     return d
 
-def cifar10(root: str, use_hog=True) -> (np.array, np.array, np.array, np.array):
+def cifar10(root: str, use_hog=True, data_normalization=False, data_standardization=False) -> (np.array, np.array, np.array, np.array):
     '''
     :param root: root path for cifar 10 directory
     :param hog: use hog or not
@@ -111,6 +126,22 @@ def cifar10(root: str, use_hog=True) -> (np.array, np.array, np.array, np.array)
         test_datas = np.array(d[b'data'], dtype=np.int32)
 
     test_labels = np.array(d[b'labels'], dtype=np.int32)
+
+    # TODO
+    # if augumentation
+
+    # normalize to 0-1
+    if data_normalization:
+        print("==> procced data normolization")
+        train_datas = normalization(train_datas)
+        test_datas  = normalization(test_datas)
+
+    if data_standardization:
+        print("==> procced data standardization")
+        train_datas = standardization(train_datas)
+        test_datas  = standardization(test_datas)
+
+
     return (train_datas, train_labels, test_datas, test_labels)
 
 def data_check(datas: np.array, labels: np.array) -> None:
@@ -135,8 +166,13 @@ def data_check(datas: np.array, labels: np.array) -> None:
         plt.show()
 
 
+# train_datas, train_labels, test_datas, test_labels, _ = get_CIFAR10_data(args.dir)
+train_datas, train_labels, test_datas, test_labels = cifar10(args.dir, use_hog=args.use_hog, \
+                        data_normalization=args.normalization, data_standardization=args.standardization)
 
-train_datas, train_labels, test_datas, test_labels = cifar10(args.dir, args.use_hog)
+print(train_datas[0])
+print(train_datas[1])
+
 print("==> train_datas shape: ", np.array(train_datas).shape)
 print("==> train_labels shape: ", np.array(train_labels).shape)
 print("==> test_datas shape: ", np.array(test_datas).shape)
@@ -215,15 +251,26 @@ elif args.model == "softmax":
     results = {}
     best_val = -1
     best_softmax = None
-    learning_rates = [1e-6, 1e-7, 5e-7]
-    regularization_strengths = [2.5e4, 5e4]
 
-    for lr in tqdm(learning_rates):
-        for rs in regularization_strengths:
+    # Grid Search
+    # learning_rates = [1e-6, 1e-7, 5e-7]
+    learning_rates = [1e-6, 1e-7]
+    
+    regularization_strengths = [2.5e4, 3e4]
+    # regularization_strengths = [10e2, 10e4]
+    interval = 5
+
+    # for lr in tqdm(learning_rates):
+    for lr in tqdm(np.linspace(learning_rates[0], learning_rates[1], num=interval)):
+        for rs in np.linspace(regularization_strengths[0], regularization_strengths[1], num=interval):
+        # for rs in regularization_strengths:
+
             softmaxClassfier = softmax()
             loss_hist = softmaxClassfier.train(train_datas, train_labels, learning_rate=lr, reg=rs,
-                        num_iters=args.iters, batch_size=args.batch_size, verbose=False)
+                        num_iters=args.iters, batch_size=args.batch_size, verbose=args.verbose)
             
+            # TODO draw loss figure
+
             y_test_pred = softmaxClassfier.predict(test_datas)
             y_train_pred = softmaxClassfier.predict(train_datas)
 
@@ -234,6 +281,21 @@ elif args.model == "softmax":
             if test_acc > best_val:
                 best_val = test_acc
                 best_softmax = softmaxClassfier
+            
+            # gradient check
+            if args.checkGradient:
+                f = lambda w: softmaxClassfier.loss(train_datas.T, train_labels, 0.0)[0]
+                print('\n==> Gradient Checking:')
+                loss, grad = softmaxClassfier.loss(train_datas.T, train_labels, 1e-5)
+                grad_check(f, softmaxClassfier.W, grad, 5)
+
+            # for test
+            break
+
+        # for test
+        break
+
+    print("\n\n ====== train result ====== \n")
     for lr, reg in sorted(results):
         train_accuracy, val_accuracy = results[(lr, reg)]
         print('lr %e reg %e train accuracy: %f val accuracy: %f' % (
