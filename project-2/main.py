@@ -11,6 +11,7 @@ from model.NearestNeighbor import NearestNeighbor
 from model.SVM import SVM
 from model.softmax import softmax
 from tools.gradient_check import grad_check,eval_numerical_gradient
+import matplotlib.pyplot as plt
 
 # use cuda or not
 def str2bool(s):
@@ -26,18 +27,19 @@ parser.add_argument('--model', required=False, default='knn', type=str, help='av
 parser.add_argument('--iters', required=False, default=200, type=int, help='max number of iterations')
 parser.add_argument('--batch_size', required=False, default=200, type=int, help='batch_size')
 parser.add_argument('--data_check', required=False, default=False, type=bool, help='check data or not')
-
 parser.add_argument('--standardization', required=False, default=False, type=bool, help='data standardization')
 parser.add_argument('--normalization', required=False, default=False, type=bool, help='data normalization')
 parser.add_argument('--verbose', required=False, default=False, type=bool, help='verbose')
 parser.add_argument('--checkGradient', required=False, default=False, type=bool, help='check Gradient')
+parser.add_argument('--visualizeWeight', required=False, default=False, type=bool, help='visualize weight for each class')
+parser.add_argument('--plotLoss', required=False, default=False, type=bool, help='visualize weight for each class')
+parser.add_argument('--testMode', required=False, default=False, type=bool, help='testMode: only train once')
 
 args = parser.parse_args()
 if args.cuda:
     import cupy as np
 else:
     import numpy as np
-# ugly code here
 
 def normalization(data):
     _range = np.max(data, axis=0) - np.min(data, axis=0)
@@ -252,11 +254,15 @@ elif args.model == "softmax":
     best_val = -1
     best_softmax = None
 
-    # Grid Search
-    # learning_rates = [1e-6, 1e-7, 5e-7]
-    learning_rates = [1e-6, 1e-7]
-    
-    regularization_strengths = [2.5e4, 3e4]
+    # check folder exist or not
+    pathToCheck = ["./plots", "./log"]
+    for path in pathToCheck:
+        if not os.path.exists(path):
+            os.mkdir(path)
+
+    # Grid Search in hype-parameter
+    learning_rates = [1e-6, 1e-8]
+    regularization_strengths = [2.5e4, 4e4]
     # regularization_strengths = [10e2, 10e4]
     interval = 5
 
@@ -269,8 +275,6 @@ elif args.model == "softmax":
             loss_hist = softmaxClassfier.train(train_datas, train_labels, learning_rate=lr, reg=rs,
                         num_iters=args.iters, batch_size=args.batch_size, verbose=args.verbose)
             
-            # TODO draw loss figure
-
             y_test_pred = softmaxClassfier.predict(test_datas)
             y_train_pred = softmaxClassfier.predict(train_datas)
 
@@ -278,10 +282,22 @@ elif args.model == "softmax":
             test_acc = np.mean(test_labels == y_test_pred)
 
             results[(lr, rs)] = (train_acc, test_acc)
+
             if test_acc > best_val:
                 best_val = test_acc
                 best_softmax = softmaxClassfier
             
+            # Plot the loss for the training
+            if args.plotLoss:
+                plt.cla()
+                plt.plot(loss_hist)
+                plt.xlabel('Iteration number')
+                plt.ylabel('Loss value')
+                info = 'LossFigure_acc={} lr={} rs={} use_hog={}'.format(test_acc, lr, rs, args.use_hog)
+                plt.title(info)
+                plt.savefig("./plots/" + info + '.png')
+                # plt.show()
+
             # gradient check
             if args.checkGradient:
                 f = lambda w: softmaxClassfier.loss(train_datas.T, train_labels, 0.0)[0]
@@ -289,13 +305,33 @@ elif args.model == "softmax":
                 loss, grad = softmaxClassfier.loss(train_datas.T, train_labels, 1e-5)
                 grad_check(f, softmaxClassfier.W, grad, 5)
 
-            # for test
+            if args.visualizeWeight:
+                plt.cla()
+                w = softmaxClassfier.W.reshape(10, 32, 32, 3)
+                w_min, w_max = np.min(w), np.max(w)
+
+                classes = ['plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
+                for i in range(10):
+                    plt.subplot(2, 5, i + 1)
+
+                    # Rescale the weights to be between 0 and 255 for image representation
+                    w_img = 255.0 * (w[i].squeeze() - w_min) / (w_max - w_min)
+                    plt.imshow(w_img.astype('uint8'))
+                    plt.axis('off')
+                    plt.title(classes[i])
+
+                info = 'WeightFigure_acc={} lr={} rs={} use_hog={}'.format(test_acc, lr, rs, args.use_hog)
+                # plt.title(info)
+                plt.savefig("./plots/" + info + '.png')
+                # plt.show()
+
+            if args.testMode:
+                break  
+
+        if args.testMode:
             break
 
-        # for test
-        break
-
-    print("\n\n ====== train result ====== \n")
+    print("\n\n ======  train result  ====== \n")
     for lr, reg in sorted(results):
         train_accuracy, val_accuracy = results[(lr, reg)]
         print('lr %e reg %e train accuracy: %f val accuracy: %f' % (
