@@ -28,7 +28,7 @@ class softmax(object):
             
             # TODO add option
 
-            # Batch normolization
+            # Batch
             # for batchId in range(int(num_train / batch_size)):
             #     X_batch = X[batchId*batch_size: (batchId+1)*batch_size]
             #     y_batch = y[batchId*batch_size: (batchId+1)*batch_size]

@@ -175,6 +175,26 @@ train_datas, train_labels, test_datas, test_labels = cifar10(args.dir, use_hog=a
 print(train_datas[0])
 print(train_datas[1])
 
+# test normalization
+# ======================================================================
+# train_data_copy = train_datas.copy()
+# train_data_normalized = normalization(train_data_copy)
+
+# orgin_image = train_data_copy[0].reshape(32,32,3)
+# # train_data_copy = np.reshape(train_data_copy, (-1, 3, 32, 32))
+# # orgin_image = np.transpose(orgin_image, (1, 2, 0))
+# plt.imshow(orgin_image, interpolation='nearest')
+# plt.show()
+# plt.cla()
+
+# train_data_normalized = np.reshape(train_data_normalized, (-1, 3, 32, 32))
+# normalized_image = np.transpose(train_data_normalized[0], (1, 2, 0))
+# print(normalized_image)
+# plt.imshow(normalized_image, interpolation='nearest')
+# plt.show()
+# plt.cla()
+# ======================================================================
+
 print("==> train_datas shape: ", np.array(train_datas).shape)
 print("==> train_labels shape: ", np.array(train_labels).shape)
 print("==> test_datas shape: ", np.array(test_datas).shape)
@@ -297,6 +317,7 @@ elif args.model == "softmax":
                 plt.title(info)
                 plt.savefig("./plots/" + info + '.png')
                 # plt.show()
+                plt.close()
 
             # gradient check
             if args.checkGradient:
@@ -307,7 +328,10 @@ elif args.model == "softmax":
 
             if args.visualizeWeight:
                 plt.cla()
-                w = softmaxClassfier.W.reshape(10, 32, 32, 3)
+                w = softmaxClassfier.W[:, :]
+                w = np.reshape(w, (-1, 3, 32, 32))
+                w = np.transpose(w, (0, 2, 3, 1))
+                w = w.reshape(10, 32, 32, 3)
                 w_min, w_max = np.min(w), np.max(w)
 
                 classes = ['plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
@@ -316,6 +340,7 @@ elif args.model == "softmax":
 
                     # Rescale the weights to be between 0 and 255 for image representation
                     w_img = 255.0 * (w[i].squeeze() - w_min) / (w_max - w_min)
+
                     plt.imshow(w_img.astype('uint8'))
                     plt.axis('off')
                     plt.title(classes[i])
@@ -324,6 +349,7 @@ elif args.model == "softmax":
                 # plt.title(info)
                 plt.savefig("./plots/" + info + '.png')
                 # plt.show()
+                plt.close()
 
             if args.testMode:
                 break  
