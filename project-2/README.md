@@ -14,6 +14,21 @@
 ## TODO
 
 - [x] Build project-2 fundamental structure
+
+- [x] Complement Softmax Classifier
+
 - [x] Add gradient check
+
 - [x] Add train process visualization
-- [ ] Modify README: add more details about softmax classifier
+
+- [x] Add data normalization and standardization
+
+- [x] Add slides
+
+- [ ] Experiment on data normalization and standardization
+
+- [ ] Experiment on data augmentation
+
+- [ ] Experiment on new feature, i.e. SIFT, HSV or GIST
+
+   
