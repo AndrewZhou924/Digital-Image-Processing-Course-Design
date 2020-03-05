@@ -12,8 +12,6 @@ Members:
 
 ---
 
-
-
 ## Experiment Record
 
 ### Experiment I
@@ -21,7 +19,7 @@ Members:
 - Proceeding Image Classification on CIFAR-10 dataset using KNN Algorithm.
 - For more details, see [README](<https://github.com/AndrewZhou924/Digital-Image-Processing-Course-Design/tree/master/project-1>)
 
+### Experiment 2
 
-
-
-
+- Proceeding Image Classification on CIFAR-10 dataset using Softmax Classifier.
+- For more details, see [README](https://github.com/AndrewZhou924/Digital-Image-Processing-Course-Design/tree/master/project-2 )
