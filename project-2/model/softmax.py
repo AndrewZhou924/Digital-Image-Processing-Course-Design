@@ -63,11 +63,16 @@ class softmax(object):
 
         # Calculation of loss
         z = np.dot(self.W, x)
-        z -= np.max(z, axis=0)  # Max trick for the softmax, preventing infinite values
-        p = np.exp(z) / np.sum(np.exp(z), axis=0)  # Softmax function
-        L = -1 / len(y) * np.sum(np.log(p[y, range(len(y))]))  # Cross-entropy loss
-        R = 0.5 * np.sum(np.multiply(self.W, self.W))  # Regularization term
-        loss = L + R * reg  # Total loss
+        # Max trick for the softmax, preventing infinite values
+        z -= np.max(z, axis=0)  
+        # Softmax function
+        p = np.exp(z) / np.sum(np.exp(z), axis=0)  
+        # Cross-entropy loss
+        L = -1 / len(y) * np.sum(np.log(p[y, range(len(y))]))  
+        # Regularization term
+        R = 0.5 * np.sum(np.multiply(self.W, self.W))  
+        # Total loss
+        loss = L + R * reg  
 
         # Calculation of dW
         p[y, range(len(y))] -= 1
@@ -77,7 +82,6 @@ class softmax(object):
     def predict(self, X):
         # y_pred = np.argmax(X.dot(self.W), axis=1)
         y_pred = np.argmax(np.dot(self.W, X.T), axis=0)
-
         return y_pred
   
 
