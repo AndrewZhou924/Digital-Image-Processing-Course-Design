@@ -1,4 +1,7 @@
-
+/plots
+*.pyc
+*.png
+*.jpg
 .idea/
 *.DS_Store
 

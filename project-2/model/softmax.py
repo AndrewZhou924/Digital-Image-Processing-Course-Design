@@ -8,17 +8,21 @@ from tools.gradient_check import grad_check,eval_numerical_gradient
 class softmax(object):
     def __init__(self):
         self.W = None
+        self.loss_L_history = []
+        self.loss_R_history = []
+        self.val_loss_history = []
 
-    def train(self, X, y, learning_rate=1e-3, reg=1e-5, num_iters=100,
+    def train(self, X, y, val_X, val_y, learning_rate=1e-3, reg=1e-5, num_iters=100,
               batch_size=200, verbose=False):
         num_train, dim = X.shape
+        num_val, val_dim = val_X.shape
         num_classes = np.max(y) + 1
 
         # initialize weight metric W
         if self.W is None:
             # C :number of classes
             # D: dimension of each flattened image
-            C, D = num_classes, 3072 
+            C, D = num_classes, 3072  #use_hog should be 324
             self.W = np.random.randn(C, D) * 0.001
 
         loss_history = []
@@ -41,14 +45,28 @@ class softmax(object):
             y_batch = y[idx]
             X_batch = X_batch.T
 
+            # idx = np.random.choice(num_val, batch_size)
+            # val_X_batch = val_X[idx, :]
+            # val_y_batch = val_y[idx]
+            # val_X_batch = val_X_batch.T
+            #
+            #
+            # val_loss, val_grad = self.loss(val_X_batch, val_y_batch, reg)
+            # self.val_loss_history.append(val_loss)
+
+            #print("train", y_batch.shape)
             loss, grad = self.loss(X_batch, y_batch, reg)
             loss_history.append(loss)
             self.W -= learning_rate * grad
+
+            if it in [2000, 6000]:
+                learning_rate *= 0.1
 
             if verbose and it % 100 == 0:
                 print('iteration %d / %d: loss %f' % (it, num_iters, loss))
 
         return loss_history
+
 
     def loss(self, x, y, reg):
         """
@@ -68,12 +86,17 @@ class softmax(object):
         # Softmax function
         p = np.exp(z) / np.sum(np.exp(z), axis=0)  
         # Cross-entropy loss
+        if np.sum(np.log(p[y, range(len(y))]))  == 0:
+
+            print("len(y)", len(y))
+            print(" np.sum(np.log(p[y, range(len(y))])) ",  np.sum(np.log(p[y, range(len(y))])) )
         L = -1 / len(y) * np.sum(np.log(p[y, range(len(y))]))  
         # Regularization term
         R = 0.5 * np.sum(np.multiply(self.W, self.W))  
         # Total loss
-        loss = L + R * reg  
-
+        loss = L + R * reg
+        self.loss_L_history.append(L)
+        self.loss_R_history.append(R)
         # Calculation of dW
         p[y, range(len(y))] -= 1
         dW = 1 / len(y) * p.dot(x.T) + reg * self.W

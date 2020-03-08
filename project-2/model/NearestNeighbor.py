@@ -1,5 +1,5 @@
 # import numpy as np
-import cupy as np
+import numpy as np
 from tqdm import tqdm
 from collections import Counter
 from skimage.feature import hog

@@ -12,6 +12,8 @@ from model.SVM import SVM
 from model.softmax import softmax
 from tools.gradient_check import grad_check,eval_numerical_gradient
 import matplotlib.pyplot as plt
+from PIL import Image
+import random
 
 # use cuda or not
 def str2bool(s):
@@ -27,13 +29,15 @@ parser.add_argument('--model', required=False, default='knn', type=str, help='av
 parser.add_argument('--iters', required=False, default=200, type=int, help='max number of iterations')
 parser.add_argument('--batch_size', required=False, default=200, type=int, help='batch_size')
 parser.add_argument('--data_check', required=False, default=False, type=bool, help='check data or not')
-parser.add_argument('--standardization', required=False, default=False, type=bool, help='data standardization')
-parser.add_argument('--normalization', required=False, default=False, type=bool, help='data normalization')
-parser.add_argument('--verbose', required=False, default=False, type=bool, help='verbose')
-parser.add_argument('--checkGradient', required=False, default=False, type=bool, help='check Gradient')
-parser.add_argument('--visualizeWeight', required=False, default=False, type=bool, help='visualize weight for each class')
-parser.add_argument('--plotLoss', required=False, default=False, type=bool, help='visualize weight for each class')
-parser.add_argument('--testMode', required=False, default=False, type=bool, help='testMode: only train once')
+parser.add_argument('--standardization', required=False, default=False, type=str2bool, help='data standardization')
+parser.add_argument('--augumentation', required=False, default=False, type=str2bool, help='data augumentation')
+parser.add_argument('--normalization', required=False, default=False, type=str2bool, help='data normalization')
+parser.add_argument('--verbose', required=False, default=False, type=str2bool, help='verbose')
+parser.add_argument('--checkGradient', required=False, default=False, type=str2bool, help='check Gradient')
+parser.add_argument('--visualizeWeight', required=False, default=False, type=str2bool, help='visualize weight for each class')
+parser.add_argument('--plotLoss', required=False, default=False, type=str2bool, help='visualize weight for each class')
+parser.add_argument('--testMode', required=False, default=False, type=str2bool, help='testMode: only train once')
+parser.add_argument('--plot_L_R_loss', required=False, default=False, type=str2bool, help='visual L and R loss seperately')
 
 args = parser.parse_args()
 if args.cuda:
@@ -50,6 +54,53 @@ def standardization(data):
     sigma = np.std(data, axis=0)
     return (data - mu) / sigma
 
+def flip_left_to_right(img):
+    im = Image.fromarray(img, mode='RGB')
+    out = im.transpose(Image.FLIP_LEFT_RIGHT)
+    return np.array(out)
+
+def flip_top_to_down(img):
+    im = Image.fromarray(img, mode='RGB')
+    out = im.transpose(Image.FLIP_TOP_BOTTOM)
+    return np.array(out)
+
+def add_black(img):
+    x = random.randint(0, 27)
+    y = x = random.randint(0, 27)
+    img[:, :,  x: x + 4] = 0
+    img[:, y: y + 4, :] = 0
+    return np.array(img)
+
+def augumentation(data, labels):
+    data = numpy.concatenate(data).reshape((-1, 3, 32, 32))
+    #data = numpy.transpose(data, (0, 2, 3, 1))
+
+    new_data = []
+    new_label = []
+    flip_top_to_down_weight = 0.2
+    flip_left_to_right_weight = 0.2
+    black_weight = 0
+
+    for i in range(len(data)):
+        seed = random.random()
+        new_data.append(data[i])
+        new_label.append(labels[i])
+
+        if seed < black_weight:
+            new_data.append(add_black(data[i]))
+            new_label.append(labels[i])
+
+    shuffle_seed = random.randint(0, 100)
+    random.seed(shuffle_seed)
+    random.shuffle(new_data)
+    random.seed(shuffle_seed)
+    random.shuffle(new_label)
+
+    new_data = np.array(new_data)
+    num_data = len(new_data)
+    new_data = new_data.reshape(num_data, -1)
+    return new_data, np.array(new_label)
+
 def unpickle(file: str) -> dict:
     '''
     :param file: path to one cifar10 item
@@ -59,7 +110,7 @@ def unpickle(file: str) -> dict:
         d = pickle.load(fo, encoding='bytes')
     return d
 
-def cifar10(root: str, use_hog=True, data_normalization=False, data_standardization=False) -> (np.array, np.array, np.array, np.array):
+def cifar10(root: str, use_hog=True, data_normalization=False, data_standardization=False, data_augumentation=False) -> (np.array, np.array, np.array, np.array):
     '''
     :param root: root path for cifar 10 directory
     :param hog: use hog or not
@@ -84,7 +135,7 @@ def cifar10(root: str, use_hog=True, data_normalization=False, data_standardizat
 
         for i in tqdm(range(train_data.shape[0])):
             # train_features.append(hog(train_data[i], orientations=9, pixels_per_cell=(8, 8), cells_per_block=(3, 3), multichannel=True))
-            train_features.append(hog(train_data[i], orientations=9, pixels_per_cell=(8, 8), cells_per_block=(2, 2), multichannel=True))
+            train_features.append(hog(train_data[i], orientations=9, pixels_per_cell=(8, 8), cells_per_block=(3, 3), multichannel=True))
         train_features = numpy.array(train_features, dtype=numpy.float32)
         train_labels = numpy.array(train_labels_list, dtype=np.int32)
 
@@ -94,7 +145,7 @@ def cifar10(root: str, use_hog=True, data_normalization=False, data_standardizat
         test_features = []
         for i in tqdm(range(test_datas.shape[0])):
             # test_features.append(hog(test_datas[i], orientations=9, pixels_per_cell=(8, 8), cells_per_block=(3, 3), multichannel=True))
-            test_features.append(hog(test_datas[i], orientations=9, pixels_per_cell=(8, 8), cells_per_block=(2, 2), multichannel=True))
+            test_features.append(hog(test_datas[i], orientations=9, pixels_per_cell=(8, 8), cells_per_block=(3, 3), multichannel=True))
         test_features = numpy.array(test_features, dtype=numpy.float32)
         test_labels = numpy.array(d[b'labels'], dtype=numpy.int32)  
 
@@ -129,8 +180,11 @@ def cifar10(root: str, use_hog=True, data_normalization=False, data_standardizat
 
     test_labels = np.array(d[b'labels'], dtype=np.int32)
 
-    # TODO
-    # if augumentation
+
+    if data_augumentation:
+        print("==> procced data augumentation")
+        train_datas, train_labels = augumentation(train_datas, train_labels)
+        test_datas, test_labels = augumentation(test_datas, test_labels)
 
     # normalize to 0-1
     if data_normalization:
@@ -170,7 +224,8 @@ def data_check(datas: np.array, labels: np.array) -> None:
 
 # train_datas, train_labels, test_datas, test_labels, _ = get_CIFAR10_data(args.dir)
 train_datas, train_labels, test_datas, test_labels = cifar10(args.dir, use_hog=args.use_hog, \
-                        data_normalization=args.normalization, data_standardization=args.standardization)
+                        data_normalization=args.normalization, data_standardization=args.standardization,\
+                                                             data_augumentation=args.augumentation)
 
 print(train_datas[0])
 print(train_datas[1])
