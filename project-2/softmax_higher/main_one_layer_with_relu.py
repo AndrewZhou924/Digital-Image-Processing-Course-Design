@@ -1,5 +1,5 @@
 from cs231n.features import color_histogram_hsv, hog_feature
-
+import matplotlib.pyplot as plt
 from cs231n.data_utils import load_cifar10
 def get_CIFAR10_data(num_training=49000, num_validation=1000, num_test=1000):
     # Load the raw CIFAR-10 data
@@ -52,12 +52,12 @@ X_test_feats = np.hstack([x_test_feats, np.ones((x_test_feats.shape[0], 1))])
 
 
 print(x_train_feats.shape)
-from cs231n.classifiers.neural_net import  TwoLayerNet
+from cs231n.classifiers.neural_net import  OneLayerNetWithRelu as OneLayerNet
 input_dim = x_train_feats.shape[1]
 hidden_dim = 500
 num_classes = 10
 
-net = TwoLayerNet(input_dim, hidden_dim, num_classes)
+net = OneLayerNet(input_dim, hidden_dim, num_classes)
 best_net = None
 results = {}
 best_val = -1
@@ -68,17 +68,45 @@ regularization_strengths = [1e-3, 5e-3, 1e-2, 1e-1, 0.5, 1]
 
 for lr in learning_rates:
     for reg in regularization_strengths:
-        net = TwoLayerNet(input_dim, hidden_dim, num_classes)
+        net = OneLayerNet(input_dim, hidden_dim, num_classes)
         #Train the network
         stats = net.train(x_train_feats, y_train, x_val_feats, y_val,
-                          num_iters=1500, batch_size=200,
+                          num_iters=3000, batch_size=200,
                           learning_rate=lr, learning_rate_decay=0.95,
                           reg=reg, verbose=False)
+
         val_acc = (net.predict(x_val_feats) == y_val).mean()
         if val_acc > best_val:
             best_val = val_acc
             best_net = net
         results[(lr, reg)] = val_acc
+
+        plt.cla()
+        plt.plot(stats['loss_history'])
+        plt.xlabel('Iteration number')
+        plt.ylabel('loss')
+        info = 'loss_history_lr={}_re={}'.format(lr, reg)
+        plt.title(info)
+        plt.savefig("./plots/" + info + '.png')
+        plt.close()
+
+        plt.cla()
+        plt.plot(stats['val_acc_history'])
+        plt.xlabel('Iteration number')
+        plt.ylabel('val_acc')
+        info = 'val_acc_history_lr={}_re={}'.format(lr, reg)
+        plt.title(info)
+        plt.savefig("./plots/" + info + '.png')
+        plt.close()
+
+        plt.cla()
+        plt.plot(stats['train_acc_history'])
+        plt.xlabel('Iteration number')
+        plt.ylabel('train_acc')
+        info = 'train_acc_history_lr={}_re={}'.format(lr, reg)
+        plt.title(info)
+        plt.savefig("./plots/" + info + '.png')
+        plt.close()
 
 for lr, reg in sorted(results):
     val_acc = results[(lr, reg)]
