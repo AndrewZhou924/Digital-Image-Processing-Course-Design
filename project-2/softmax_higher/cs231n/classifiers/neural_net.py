@@ -60,7 +60,7 @@ class TwoLayerNet(object):
         softmax_output = np.exp(shift_scores)/np.sum(np.exp(shift_scores), axis=1).reshape(-1, 1)
         loss = -np.sum(np.log(softmax_output[range(N), list(y)]))
         loss /= N
-        loss += 0.5 * reg * (np.sum(w1*w1) + np.sum(w2*w2))
+        loss += 0.5 * reg * (np.sum(w1) + np.sum(np.abs(w2)))
 
         #backward pass : compute gradients
         grads = {}
@@ -69,12 +69,23 @@ class TwoLayerNet(object):
         dscores = softmax_output.copy()
         dscores[range(N), list(y)] -= 1
         dscores /= N
-        grads['w2'] = h_output.T.dot(dscores) + reg * w2
+        if w2 > 0:
+            grads['w2'] = h_output.T.dot(dscores) + reg
+        elif w2 < 0:
+            grads['w2'] = h_output.T.dot(dscores) - reg
+        else:
+            grads['w2'] = h_output.T.dot(dscores)
+
         grads['b2'] = np.sum(dscores, axis = 0)
         #the first layer grad computer
         dh = dscores.dot(w2.T)
         dh_ReLu = (h_output > 0) * dh
-        grads['w1'] = x.T.dot(dh_ReLu) + reg * w1
+        if w1 > 0:
+            grads['w1'] = x.T.dot(dh_ReLu) + reg
+        elif w1 < 0:
+            grads['w1'] = x.T.dot(dh_ReLu) - reg
+        else:
+            grads['w1'] = x.T.dot(dh_ReLu)
         grads['b1'] = np.sum(dh_ReLu, axis = 0)
         return loss, grads
 
