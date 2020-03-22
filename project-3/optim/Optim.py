@@ -1,4 +1,3 @@
-import numpy as np
 class Optim:
     def __init__(self, *args, **kwargs):
         pass

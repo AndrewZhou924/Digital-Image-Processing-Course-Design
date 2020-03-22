@@ -5,7 +5,7 @@ class Dense(Layer):
     def __repr__(self):
         return 'Dense'
 
-    def __init__(self, in_features, out_features):
+    def __init__(self, in_features, out_features, cuda=False):
         super().__init__()
 
         self.parameters = [
@@ -27,10 +27,10 @@ class Dense(Layer):
         self.db = np.zeros(self.parameters[1].shape)
         return y
 
-    def backward(self, dy, weight_decay=0, *args, **kwargs):
+    def backward(self, dy, *args, **kwargs):
         self.dx = np.dot(dy, self.parameters[0].transpose())
 
-        self.dw = np.dot(self.dw, dy) + weight_decay * self.parameters[0]
+        self.dw = np.dot(self.dw, dy)
 
         self.db = np.sum(dy, axis=0)
         return self.dx

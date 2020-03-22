@@ -8,3 +8,5 @@ from .Tanh import Tanh
 from .Module import Module
 
 from .CrossEntropy import CrossEntropyLoss
+
+from . import init

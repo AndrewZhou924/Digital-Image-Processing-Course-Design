@@ -11,12 +11,12 @@ class Module:
             x = layer(x)
         return x
 
-    def backward(self, grad, weight_decay=5e-4):
+    def backward(self, grad):
         for i in range(len(self.layers)-1, -1, -1):
             if i==len(self.layers)-1:
-                self.layers[i].backward(grad, weight_decay=weight_decay)
+                self.layers[i].backward(grad)
             else:
-                self.layers[i].backward(self.layers[i+1].dx, weight_decay=weight_decay)
+                self.layers[i].backward(self.layers[i+1].dx)
 
     def update(self, optimizer):
         for layer in self.layers:
